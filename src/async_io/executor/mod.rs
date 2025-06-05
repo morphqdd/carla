@@ -1,4 +1,5 @@
 use crate::async_io::task_queue::{Task, TaskQueue};
+use crate::async_io::waker_util::waker;
 
 pub struct Executor {
     task_queue: TaskQueue
@@ -15,6 +16,10 @@ impl Executor {
 
     pub fn run(&mut self) {
         while let Some(mut task) = self.task_queue.pop() {
+            let waker = waker(move || {
+
+            });
+
             match task.future.as_mut().poll() {
 
             }
