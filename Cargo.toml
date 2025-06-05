@@ -5,3 +5,5 @@ edition = "2024"
 
 [dependencies]
 anyhow = "1.0.98"
+polling = {version = "3.8.0", features = []}
+lazy_static = "1.5.0"
