@@ -94,4 +94,8 @@ impl Reactor {
     pub fn wait(&self, events: &mut Events, timeout: Option<Duration>) -> Result<usize> {
         Ok(self.poller.wait(events, timeout)?)
     }
+    
+    pub fn waiting_on_events(&self) -> bool {
+        !self.readable.is_empty() || !self.writable.is_empty()
+    }
 }

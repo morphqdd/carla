@@ -38,6 +38,15 @@ impl Executor {
                 }
             }
 
+            {
+                if !REACTOR.read()
+                    .map_err(|e| anyhow!("{e}"))?
+                    .waiting_on_events()
+                {
+                    return Ok(());    
+                }
+            }
+
             self.wait_for_io()?;
 
             self.task_queue.recv();
