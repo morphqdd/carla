@@ -4,6 +4,9 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use anyhow::{anyhow, Result};
 use crate::async_io::reactor::REACTOR;
+use crate::net::client::TcpClient;
+
+pub mod client;
 
 pub struct TcpListener {
     listener: net::TcpListener,
@@ -31,11 +34,11 @@ pub struct AcceptStream<'listener> {
 }
 
 impl Future for AcceptStream<'_> {
-    type Output = Result<(net::TcpStream, net::SocketAddr)>;
+    type Output = Result<(TcpClient, net::SocketAddr)>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         match self.listener.accept() {
-            Ok(val) => Poll::Ready(Ok(val)),
+            Ok((stream, addr)) => Poll::Ready(Ok((TcpClient::new(stream), addr))),
             Err(err) if err.kind() == ErrorKind::WouldBlock => {
                 let mut reactor = REACTOR.write()
                     .map_err(|e| anyhow!("{e}"))?;
@@ -50,6 +53,6 @@ impl Future for AcceptStream<'_> {
 
 impl Drop for AcceptStream<'_> {
     fn drop(&mut self) {
-        REACTOR.write().unwrap().remove(&self.listener);
+        REACTOR.write().unwrap().remove(self.listener);
     }
 }

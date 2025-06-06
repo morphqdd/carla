@@ -4,24 +4,23 @@ use std::sync::mpsc::{Receiver, Sender};
 
 pub type LocalBoxedFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + Sync + 'a>>;
 
-pub struct TaskQueue {
-    sender: Sender<Task>,
-    receiver: Receiver<Task>,
-    tasks: Vec<Task>
+pub struct TaskQueue<T: Send + 'static> {
+    sender: Sender<Arc<Task<T>>>,
+    receiver: Receiver<Arc<Task<T>>>,
+    tasks: Vec<Arc<Task<T>>>
 }
 
-#[derive(Clone)]
-pub struct Task {
-    pub(crate) future: Arc<RwLock<LocalBoxedFuture<'static, ()>>>
+pub struct Task<T: Send + 'static> {
+    pub(crate) future: RwLock<LocalBoxedFuture<'static, T>>
 }
 
-impl TaskQueue {
+impl<T: Send + 'static> TaskQueue<T> {
     pub fn new() -> Self {
         let (sender, receiver) = mpsc::channel();
         Self { sender, receiver, tasks: vec![] }
     }
 
-    pub fn sender(&self) -> Sender<Task> {
+    pub fn sender(&self) -> Sender<Arc<Task<T>>> {
         self.sender.clone()
     }
 
@@ -31,11 +30,11 @@ impl TaskQueue {
         }
     }
 
-    pub fn push(&mut self, task: Task) {
+    pub fn push(&mut self, task: Arc<Task<T>>) {
         self.tasks.push(task);
     }
 
-    pub fn pop(&mut self) -> Option<Task> {
+    pub fn pop(&mut self) -> Option<Arc<Task<T>>> {
         self.tasks.pop()
     }
 

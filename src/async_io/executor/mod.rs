@@ -6,17 +6,17 @@ use anyhow::{anyhow, Result};
 use polling::Events;
 use crate::async_io::reactor::REACTOR;
 
-pub struct Executor {
-    task_queue: TaskQueue
+pub struct Executor<T: Send + 'static> {
+    task_queue: TaskQueue<T>
 }
 
-impl Executor {
+impl<T: Send + 'static> Executor<T> {
     pub fn new() -> Self {
         Self { task_queue: TaskQueue::new() }
     }
 
-    pub fn spawn(&mut self, f: impl Future<Output = ()> + Send + Sync + 'static) {
-        self.task_queue.push(Task { future: Arc::new(RwLock::new(Box::pin(f))) });
+    pub fn spawn(&mut self, f: impl Future<Output = T> + Send + Sync + 'static) {
+        self.task_queue.push(Arc::new(Task { future: RwLock::new(Box::pin(f)) }));
     }
 
     pub fn run(&mut self) -> Result<()> {
@@ -30,9 +30,12 @@ impl Executor {
 
                 let mut ctx = Context::from_waker(&waker);
 
-                match task.future.write()
-                    .map_err(|e| anyhow!("{e}"))?
-                    .as_mut().poll(&mut ctx) {
+                let res = {
+                    let mut future = task.future.write()
+                        .map_err(|e| anyhow!("{e}"))?;
+                    future.as_mut().poll(&mut ctx)
+                }; 
+                match res {
                     Poll::Ready(_) => {}
                     Poll::Pending => {}
                 }

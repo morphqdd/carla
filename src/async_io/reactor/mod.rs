@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fmt::Debug;
 use std::os::windows::prelude::AsRawSocket;
 use std::sync::{Arc, RwLock};
 use std::task::{Context, Waker};
@@ -51,14 +52,16 @@ impl Reactor {
         self.writable.remove(&key);
     }
 
-    pub fn wake_on_readable(&mut self, source: impl AsSource, ctx: &mut Context) {
+    pub fn wake_on_readable(&mut self, source: impl AsSource + Debug, ctx: &mut Context) {
         let key = source.source().as_raw_socket();
         self.readable
             .entry(key as usize)
             .or_default()
             .push(ctx.waker().clone());
 
-        self.poller.modify(source, self.get_interest(&key)).unwrap()
+        println!("{source:?}");
+        
+        self.poller.modify(source, self.get_interest(&key)).unwrap();
     }
 
     pub fn wake_on_writable(&mut self, source: impl AsSource, ctx: &mut Context) {
