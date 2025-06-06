@@ -1,3 +1,4 @@
+use std::fmt::Debug;
 use std::mem::ManuallyDrop;
 use std::sync::Arc;
 use std::task::{RawWaker, RawWakerVTable, Waker};

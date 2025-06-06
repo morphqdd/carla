@@ -3,26 +3,52 @@ use std::task::{Context, Poll};
 use crate::async_io::task_queue::{Task, TaskQueue};
 use crate::async_io::waker_util::waker;
 use anyhow::{anyhow, Result};
+use once_cell::sync::Lazy;
 use polling::Events;
 use crate::async_io::reactor::REACTOR;
 
-pub struct Executor<T: Send + 'static> {
-    task_queue: TaskQueue<T>
+pub static EXECUTOR: Lazy<Arc<Executor>> = Lazy::new(|| {
+    Arc::new(Executor::new())
+});
+
+pub fn block_on(f: impl Future<Output = Result<()>> + Send + Sync + 'static) -> Result<()> {
+    let executor = EXECUTOR.clone();
+    executor.spawn(f);
+    executor.run()?;
+    Ok(())
 }
 
-impl<T: Send + 'static> Executor<T> {
+pub fn spawn(f: impl Future<Output = Result<()>> + Send + Sync + 'static) {
+    let executor = EXECUTOR.clone();
+    executor.spawn(f)
+}
+
+pub struct Executor {
+    task_queue: RwLock<TaskQueue>
+}
+
+impl Default for Executor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Executor {
     pub fn new() -> Self {
-        Self { task_queue: TaskQueue::new() }
+        Self { task_queue: RwLock::new(TaskQueue::new()) }
     }
 
-    pub fn spawn(&mut self, f: impl Future<Output = T> + Send + Sync + 'static) {
-        self.task_queue.push(Arc::new(Task { future: RwLock::new(Box::pin(f)) }));
+    pub fn spawn(&self, f: impl Future<Output = Result<()>> + Send + Sync + 'static) {
+        self.task_queue.write().unwrap().push(Arc::new(Task { future: RwLock::new(Box::pin(f)) }));
     }
 
-    pub fn run(&mut self) -> Result<()> {
+    pub fn run(&self) -> Result<()> {
         loop {
-            while let Some(task) = self.task_queue.pop() {
-                let sender = self.task_queue.sender();
+            while let Some(task) = { self.task_queue.write().map_err(|e| anyhow!("{e}"))?.pop() } {
+                let sender = self.task_queue
+                    .read()
+                    .map_err(|e| anyhow!("{e}"))?
+                    .sender();
                 let waker_task = task.clone();
                 let waker = waker(move || {
                     sender.send(waker_task.clone()).unwrap();
@@ -36,8 +62,8 @@ impl<T: Send + 'static> Executor<T> {
                     future.as_mut().poll(&mut ctx)
                 }; 
                 match res {
-                    Poll::Ready(_) => {}
-                    Poll::Pending => {}
+                    Poll::Ready(res) => res?,
+                    Poll::Pending => continue
                 }
             }
 
@@ -52,11 +78,16 @@ impl<T: Send + 'static> Executor<T> {
 
             self.wait_for_io()?;
 
-            self.task_queue.recv();
+            self.task_queue
+                .write()
+                .map_err(|e| anyhow!("{e}"))?
+                .recv();
+            
+            println!("{:?}", self.task_queue)
         }
     }
 
-    fn wait_for_io(&mut self) -> Result<()> {
+    fn wait_for_io(& self) -> Result<()> {
         let mut events = Events::new();
         {
             let reactor = REACTOR.read()

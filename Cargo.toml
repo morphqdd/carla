@@ -6,4 +6,12 @@ edition = "2024"
 [dependencies]
 anyhow = "1.0.98"
 polling = {version = "3.8.0", features = []}
-lazy_static = "1.5.0"
+once_cell = "1.21.3"
+carla_macros = {path = "src/crates/carla_macros"}
+rand = "0.9.1"
+
+[workspace]
+members = ['src/crates/carla_macros', 'examples/simple_http']
+
+[features]
+macros = []

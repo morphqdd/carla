@@ -1,3 +1,7 @@
 /target
 .idea
 Cargo.lock
+src/crates/**/target
+examples/**/target
+src/crates/**/Cargo.lock
+examples/**/Cargo.lock

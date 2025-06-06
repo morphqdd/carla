@@ -4,18 +4,25 @@ use std::os::windows::prelude::AsRawSocket;
 use std::sync::{Arc, RwLock};
 use std::task::{Context, Waker};
 use std::time::Duration;
-use lazy_static::lazy_static;
 use polling::{AsRawSource, AsSource, Event, Events, Poller};
 use anyhow::Result;
+use once_cell::sync::Lazy;
 
-lazy_static! {
-    pub static ref REACTOR: Arc<RwLock<Reactor>> = Arc::new(RwLock::new(Reactor::new()));
-}
+pub static REACTOR: Lazy<Arc<RwLock<Reactor>>> = Lazy::new(|| {
+    Arc::new(RwLock::new(Reactor::new()))
+});
+
 
 pub struct Reactor {
     readable: HashMap<usize, Vec<Waker>>,
     writable: HashMap<usize, Vec<Waker>>,
     poller: Poller
+}
+
+impl Default for Reactor {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Reactor {
